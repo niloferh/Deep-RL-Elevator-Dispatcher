@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liftsim-dispatch"
+version = "0.1.0"
+requires-python = ">=3.10,<3.13"
+dependencies = ["numpy>=1.24,<2", "gym==0.25.2", "metagym==0.1.1"]
+
+[project.optional-dependencies]
+ppo = ["torch>=2.1", "tqdm>=4", "matplotlib>=3.7"]
+report = ["matplotlib>=3.7", "pillow>=10.1", "imageio>=2.31", "imageio-ffmpeg>=0.4"]
+
+[tool.setuptools]
+packages = ["liftsim_dispatch"]
+
+[tool.setuptools.package-data]
+liftsim_dispatch = ["config.ini"]
