@@ -11,7 +11,7 @@ python -m pip install -e .
 python -m liftsim_dispatch.benchmark
 ```
 
-This runs the notebook's expert heuristic, a classic nearest-car heuristic, and a random valid-call baseline. The runner writes `outputs/benchmark_results.csv` with official LiftSim reward, deliveries, generated passengers, abandonments, passenger time, energy, and the notebook's validation objective.
+Random valid-call dispatch is the built-in baseline. Add a PPO checkpoint or team policy to compare it against the same seeds. The runner writes `outputs/benchmark_results.csv` with official LiftSim reward, deliveries, generated passengers, abandonments, passenger time, energy, and the notebook's validation objective.
 
 ## Train and evaluate PPO
 
