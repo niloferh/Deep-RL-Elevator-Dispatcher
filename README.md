@@ -56,6 +56,57 @@ python -m liftsim_dispatch.benchmark \
 2. **Train the policy.** PPO first imitates a heuristic that scores assignments by distance, queue size, and wait age. A shared neural scorer then learns corrections to those scores through PPO with generalized advantage estimation (GAE). The training reward favors completed rides and penalizes waiting, energy, and abandonments.
 3. **Compare on matched traffic.** The benchmark evaluates PPO, random dispatch, and any supplied team policies on the same held-out seeds. Every policy gets a 10-floor, 4-car building and 600 physics ticks per episode under the default scenario. The report uses official LiftSim reward alongside operational metrics and prints paired bootstrap intervals for PPO versus Random.
 
+## Evaluation metrics
+
+Each CSV row summarizes one policy on one episode. Under the default 300-second episode, LiftSim's 10-minute rolling statistics cover the entire episode.
+
+| CSV field | Definition | Preferred direction |
+| --- | --- | --- |
+| `raw_reward` | Sum of the official LiftSim rewards across physics ticks | Higher |
+| `delivered` | Passengers who reached their destination by episode end | Higher |
+| `generated` | Passengers created during the episode. Use this to check that paired policies saw the same demand. | Traffic context |
+| `abandoned` | Passengers who gave up waiting before boarding | Lower |
+| `waiting_seconds` | Total passenger-seconds spent in queues **and riding in cars**. The CSV uses LiftSim's `TotalWaitingTime` statistic. | Lower |
+| `energy` | Sum of the simulator's elevator energy consumption across ticks | Lower |
+| `validation_objective` | Episode score combining completed trips, passenger time, energy, and abandonments. Training selects the checkpoint with the highest mean score on six validation seeds. | Higher |
+
+For each physics tick, the official LiftSim reward is:
+
+```text
+-0.0001 × (passenger_seconds + 0.0005 × energy + 300 × abandoned)
+```
+
+The separate validation score uses episode totals:
+
+```text
+delivered − 0.008 × passenger_seconds − 0.000005 × energy − 3 × abandoned
+```
+
+PPO uses a shaped reward for each dispatch decision. Each delta is the nonnegative change in the corresponding simulator statistic over that decision:
+
+```text
+2 × Δdelivered − 0.012 × Δpassenger_seconds − 0.000006 × Δenergy − 5 × Δabandoned
+```
+
+The benchmark prints means and sample standard deviations across seeds. For PPO versus Random, it computes a difference on each matched seed and resamples those differences 10,000 times for a 95% percentile interval. Win rate counts strict improvements in the preferred direction. The throughput percentage is `100 × (mean PPO deliveries / mean Random deliveries − 1)`.
+
+## Default initialization settings
+
+| Setting | Default and purpose |
+| --- | --- |
+| Building | 10 floors, 4 cars, and 4.0 m between floors in `config.ini` |
+| Simulation clock | 0.5 seconds per physics tick, 3 ticks per decision, and 600 ticks per episode. This gives 1.5 seconds between decisions and a 5-minute episode. |
+| Traffic | Uniform random origin and destination on different floors, with `ParticleNumber = 12` and `GenerationInterval = 35`. These control the rate of passenger generation. |
+| Legal candidates | Up to 16 eligible idle-car and hall-call pairs per decision. Action 0 waits when no assignment is available. |
+| Seeds | 42 for model initialization and the initial training simulator seed. Demonstrations use 1100–1123, validation uses 710–715, the benchmark uses 12001–12030, and the video uses 12040. |
+| Actor initialization | The final pairwise scoring layer starts with orthogonal weights (gain 0.02) and zero bias. The actor adds 0.65 times the heuristic prior to its learned score before applying the legal-action mask. |
+| Imitation warm start | 24 demonstration episodes and 16 imitation epochs. The heuristic favors shorter travel distance, older calls, and larger queues. Set either `--demo-episodes 0` or `--imitation-epochs 0` to skip imitation. |
+| PPO updates | 60,000 decisions, 768 decisions per rollout, 192 samples per minibatch, and up to 4 optimization epochs per rollout. Adam uses learning rate 0.00025 and epsilon 0.00001. |
+| PPO/GAE controls | Discount 0.993, GAE lambda 0.95, policy clip 0.18, value loss coefficient 0.4, entropy coefficient 0.004, and target KL 0.035. |
+| Device | CUDA when available, otherwise CPU. Use `--device cpu` to select CPU explicitly. |
+
+The heuristic prior score is `−distance + 0.022 × min(oldest_wait_seconds, 300) + 1.25 × log1p(queue_length)`. It ranks candidate pairs and provides the initial scoring bias for PPO. Random dispatch samples uniformly from the same legal action mask.
+
 ## Add a team policy
 
 Place a module such as `my_policy.py` at the repository root. Expose a factory that takes the episode seed and returns a callable. The runner calls the factory for each episode so policy state can start fresh.
