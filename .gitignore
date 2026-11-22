@@ -8,3 +8,22 @@ stable_diff
 build/
 rlschool.egg-info/
 *.whl
+
+
+# ADDED BY KHALESAH
+# python virtual environment
+.venv/
+venv/
+
+# python generated files
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# simulation-generated files
+animation_buffer/
+image_buffer/
+
+# generated results
+# project/results/logs/
+
