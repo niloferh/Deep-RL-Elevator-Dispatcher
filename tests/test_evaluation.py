@@ -6,7 +6,7 @@ import numpy as np
 from liftsim_dispatch.benchmark import run_benchmark
 from liftsim_dispatch.env import CallAwareLiftSim, MAX_SIM_TICKS
 from liftsim_dispatch.evaluation import evaluate_episode
-from liftsim_dispatch.policies import expert, nearest_car
+from liftsim_dispatch.policies import random_valid
 
 
 class EvaluationTests(unittest.TestCase):
@@ -15,24 +15,24 @@ class EvaluationTests(unittest.TestCase):
 
         def make_policy(seed):
             seeds_seen.append(seed)
-            return nearest_car
+            return random_valid
 
         seeds = [12001, 12002]
-        rows = run_benchmark({"Classic": make_policy, "Expert": lambda seed: expert}, seeds)
+        rows = run_benchmark({"Custom random": make_policy, "Random": lambda seed: random_valid}, seeds)
         self.assertEqual(seeds_seen, seeds)
         self.assertEqual([(row["seed"], row["policy"]) for row in rows],
-                         [(seed, name) for seed in seeds for name in ("Classic", "Expert")])
-        for classic, reference in zip(rows[::2], rows[1::2]):
-            self.assertGreater(classic["delivered"], 0)
-            self.assertEqual(classic["generated"], reference["generated"])
+                         [(seed, name) for seed in seeds for name in ("Custom random", "Random")])
+        for custom, reference in zip(rows[::2], rows[1::2]):
+            self.assertGreater(custom["delivered"], 0)
+            self.assertEqual(custom["generated"], reference["generated"])
 
     def test_recording_and_policy_randomness_preserve_episode(self):
         def choose(decision):
             random.random()
             np.random.random()
-            return expert(decision)
+            return random_valid(decision)
 
-        plain = evaluate_episode(expert, 12001)
+        plain = evaluate_episode(random_valid, 12001)
         recorded = evaluate_episode(choose, 12001, record=True)
         self.assertEqual(plain["stats"], recorded["stats"])
         self.assertAlmostEqual(plain["return"], recorded["return"])
