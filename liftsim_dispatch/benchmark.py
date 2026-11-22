@@ -9,10 +9,9 @@ import numpy as np
 
 from .env import DEFAULT_CONFIG
 from .evaluation import evaluate_episode, score_of
-from .policies import expert, nearest_car, random_valid
+from .policies import random_valid
 
 TEST_SEEDS = range(12001, 12031)
-BASELINES = {"Expert": expert, "Nearest car": nearest_car, "Random": random_valid}
 STAT_KEYS = {
     "delivered": "DeliveredPersons(10Minutes)",
     "generated": "GeneratedPersons(10Minutes)",
@@ -107,8 +106,7 @@ def main():
     parser.add_argument("--video-seed", type=int, default=12040)
     args = parser.parse_args()
 
-    factories = {name: (lambda seed, policy=policy: policy)
-                 for name, policy in BASELINES.items()}
+    factories = {"Random": lambda seed: random_valid}
     if args.checkpoint:
         import torch
 
