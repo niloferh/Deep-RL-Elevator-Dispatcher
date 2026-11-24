@@ -61,8 +61,9 @@ class MansionManager(object):
         # if people are waiting for more than 300 seconds, he would give up!
         self._given_up_time_limit = 300
 
-        #used for statistics
-        self._statistic_interval = int(600 / self._dt)
+        # used for statistics
+        # self._statistic_interval = int(600 / self._dt)
+        self._statistic_interval = float('inf')
         self._delivered_person = deque()
         self._generated_person = deque()
         self._abandoned_person = deque()
@@ -257,11 +258,16 @@ class MansionManager(object):
         Get Mansion Statistics
         """
         return {
-            "DeliveredPersons(10Minutes)": int(sum(self._delivered_person)),
-            "GeneratedPersons(10Minutes)": int(sum(self._generated_person)),
-            "AbandonedPersons(10Minutes)": int(sum(self._abandoned_person)),
-            "EnergyConsumption(10Minutes)": float(sum(self._cumulative_energy_consumption)),
-            "TotalWaitingTime(10Minutes)": float(sum(self._cumulative_waiting_time))}
+            # "DeliveredPersons(10Minutes)": int(sum(self._delivered_person)),
+            # "GeneratedPersons(10Minutes)": int(sum(self._generated_person)),
+            # "AbandonedPersons(10Minutes)": int(sum(self._abandoned_person)),
+            # "EnergyConsumption(10Minutes)": float(sum(self._cumulative_energy_consumption)),
+            # "TotalWaitingTime(10Minutes)": float(sum(self._cumulative_waiting_time))}
+            "DeliveredPersons": int(sum(self._delivered_person)),
+            "GeneratedPersons": int(sum(self._generated_person)),
+            "AbandonedPersons": int(sum(self._abandoned_person)),
+            "EnergyConsumption": float(sum(self._cumulative_energy_consumption)),
+            "TotalWaitingTime": float(sum(self._cumulative_waiting_time))}
 
     @property
     def attribute(self):
