@@ -9,12 +9,7 @@ from project.agents.random_agent import RandomAgent
 ### COMPLETE - ADD LIBRARIES THAT YOU NEED TO RUN YOUR AGENT
 
 
-<<<<<<< HEAD
-def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status, render):
-=======
-def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, render,
-                *, ppo_checkpoint=None, ppo_train_decisions=60_000):
->>>>>>> b3e6d6f986fa3a56092aa44eb769eb83e4fc244f
+def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status, render, *, ppo_checkpoint=None, ppo_train_decisions=60_000):
     
     # SET CONFIG FILE BASED ON INPUT PARAMETER
 
