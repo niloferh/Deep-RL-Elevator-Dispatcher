@@ -4,12 +4,13 @@ from datetime import datetime
 
 from metagym.liftsim.environment.env import LiftSim
 from metagym.liftsim.environment.mansion import mansion_manager
-from project.agents.random_agent import RandomAgent
 
 ### COMPLETE - ADD LIBRARIES THAT YOU NEED TO RUN YOUR AGENT
+from project.agents.random_agent import RandomAgent
+from project.agents.ppo_agent import PPOAgent       # can put this inside the case statement
 
 
-def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status, render, *, ppo_checkpoint=None, ppo_train_decisions=60_000):
+def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status=True, render=True, *, ppo_checkpoint=None, ppo_train_decisions=60_000):
     
     # SET CONFIG FILE BASED ON INPUT PARAMETER
 
@@ -39,7 +40,6 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
             ### COMPLETE - ADD CODE TO CALL YOUR AGENT WITH THE NECESSASRY INPUT PARAMETERS
             print("DQN")
         case "PPO":
-            from project.agents.ppo_agent import PPOAgent
             agent = PPOAgent(env, checkpoint=ppo_checkpoint)
             if ppo_checkpoint is None:
                 agent.fit(total_decisions=ppo_train_decisions, episode_steps=num_episode_steps)
