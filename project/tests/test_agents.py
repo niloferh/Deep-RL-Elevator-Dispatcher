@@ -9,7 +9,7 @@ from project.agents.random_agent import RandomAgent
 ### COMPLETE - ADD LIBRARIES THAT YOU NEED TO RUN YOUR AGENT
 
 
-def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, render):
+def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status, render):
     
     # SET CONFIG FILE BASED ON INPUT PARAMETER
 
@@ -61,7 +61,7 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
         total_energy_consumed = 0
         total_abandoned_passengers = 0
         
-        # reset mansion statistics (otherwise will cumulate over episodes)
+        # reset mansion statistics (otherwise will accumulate over episodes)
         env._mansion._delivered_person.clear()
         env._mansion._generated_person.clear()
         env._mansion._abandoned_person.clear()
@@ -88,11 +88,28 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
             if render: 
                 env.render()
 
-            # print out information while running - for debugging purposes
+            # print out information during episode while running - for debugging purposes
             # print(f"Step: {step}")
             # print(f"Action: {action}") 
             # print(f"Reward: {reward}")
             # print(info)
+            
+            if print_elevator_status == True:
+                # print out elevator statuses 
+                print("-----------------------------------------------------------")
+                default_action = [-1, 0]
+                for elevator in range(env._mansion._elevator_number):
+                    curr_action = [action[2 * elevator], action[2 * elevator +1]]
+                    if curr_action == default_action:
+                        if observation.ElevatorStates[elevator].ReservedTargetFloors:
+                            print(f"Elevator {elevator} Drop Off in Progress at {observation.ElevatorStates[elevator].ReservedTargetFloors}")
+                        elif observation.ElevatorStates[elevator].DoorState > 0:
+                            print(f"Elevator {elevator} Door Opening/Closing")
+                        else:
+                            print(f"Elevator {elevator} Stopped")
+
+                    else:
+                        print(f"Elevator {elevator} Pickup at {curr_action}")
 
         
         # for each episode get statistics provided by environment
@@ -110,7 +127,7 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
             "total_abandoned_passengers": total_abandoned_passengers,
         }
         
-        # add environment statistics as individual columns
+        # add environment statistics as individual dictionary items
         for key, value in environment_statistics.items():
             episode_results[f"Environment Stat - {key}"] = value
 
@@ -122,6 +139,9 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
         # print(f"Total energy consumed: {total_energy_consumed}")
         # print(f"Total abandoned passengers: {total_abandoned_passengers}")
         # print(environment_statistics)        
+        
+        # print progress
+        print(f"Episode {episode} completed")
         
     # close environment
     env.close()

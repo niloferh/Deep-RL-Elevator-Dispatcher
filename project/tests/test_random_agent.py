@@ -25,7 +25,7 @@ step = 0
 
 #for step in range(500):
 while not done:
-    action = agent.act(observation)
+    action = agent.action(observation)
 
     #action = [0] * (2 * 6)  # Initialize action list for 6 elevators
     observation, reward, done, info = env.step(action)
