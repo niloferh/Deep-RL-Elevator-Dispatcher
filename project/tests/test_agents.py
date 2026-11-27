@@ -9,7 +9,12 @@ from project.agents.random_agent import RandomAgent
 ### COMPLETE - ADD LIBRARIES THAT YOU NEED TO RUN YOUR AGENT
 
 
+<<<<<<< HEAD
 def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status, render):
+=======
+def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, render,
+                *, ppo_checkpoint=None, ppo_train_decisions=60_000):
+>>>>>>> b3e6d6f986fa3a56092aa44eb769eb83e4fc244f
     
     # SET CONFIG FILE BASED ON INPUT PARAMETER
 
@@ -39,8 +44,10 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
             ### COMPLETE - ADD CODE TO CALL YOUR AGENT WITH THE NECESSASRY INPUT PARAMETERS
             print("DQN")
         case "PPO":
-            ### COMPLETE - ADD CODE TO CALL YOUR AGENT WITH THE NECESSASRY INPUT PARAMETERS
-            print("PPO")
+            from project.agents.ppo_agent import PPOAgent
+            agent = PPOAgent(env, checkpoint=ppo_checkpoint)
+            if ppo_checkpoint is None:
+                agent.fit(total_decisions=ppo_train_decisions, episode_steps=num_episode_steps)
         case _:
             raise ValueError(f"Unknown agent type: {agent_type}")
     
@@ -52,6 +59,8 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
         
         # initialize environment
         observation = env.reset()
+        if agent_type == "PPO":
+            agent.reset()
         done = False
         step = 0
         
