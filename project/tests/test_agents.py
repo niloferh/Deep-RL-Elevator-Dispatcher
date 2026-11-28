@@ -8,9 +8,10 @@ from metagym.liftsim.environment.mansion import mansion_manager
 ### COMPLETE - ADD LIBRARIES THAT YOU NEED TO RUN YOUR AGENT
 from project.agents.random_agent import RandomAgent
 from project.agents.ppo_agent import PPOAgent       # can put this inside the case statement
+from project.agents.dqn.dqn_agent.agent import DQNAgent
 
 
-def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status=True, render=True, *, ppo_checkpoint=None, ppo_train_decisions=60_000):
+def test_agents(agent_type, config_filename, num_test_episodes, num_episode_steps, print_elevator_status=True, render=True, *, ppo_checkpoint=None, ppo_train_decisions=60_000, dqn_checkpoint='dqn_elevator.pth'):
     
     # SET CONFIG FILE BASED ON INPUT PARAMETER
 
@@ -37,8 +38,16 @@ def test_agents(agent_type, config_filename, num_test_episodes, num_episode_step
             ### COMPLETE - ADD CODE TO CALL YOUR AGENT WITH THE NECESSASRY INPUT PARAMETERS
             print("collective_control")
         case "DQN":
-            ### COMPLETE - ADD CODE TO CALL YOUR AGENT WITH THE NECESSASRY INPUT PARAMETERS
-            print("DQN")
+            observation = env.reset()
+            states = DQNAgent.get_state(observation)
+            state_dim = len(states[0])
+            num_floors = observation.ElevatorStates[0].MaximumFloor
+            action_dim = 2 * num_floors + 2
+
+            agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
+
+            checkpoint_path = PROJECT_DIR / "checkpoints" / dqn_checkpoint
+            agent.load_checkpoint(checkpoint_path)
         case "PPO":
             agent = PPOAgent(env, checkpoint=ppo_checkpoint)
             if ppo_checkpoint is None:

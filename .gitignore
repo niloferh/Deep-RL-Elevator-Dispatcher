@@ -26,4 +26,5 @@ image_buffer/
 
 # generated results
 project/results/
-
+project/plots/
+project/checkpoints/
