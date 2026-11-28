@@ -30,6 +30,7 @@ test_agents("random", "config_three_elevators.ini", num_test_episodes, num_episo
 # COLLECTIVE
 
 # DQN
+test_agents("DQN", "config_three_elevators.ini", num_test_episodes, num_episode_steps, print_elevator_status, render_animation, dqn_checkpoint='dqn_elevator.pth')
 
 # PPO
 

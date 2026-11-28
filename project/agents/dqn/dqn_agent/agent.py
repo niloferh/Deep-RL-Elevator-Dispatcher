@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from dqn_agent.network import DQN
-from dqn_agent.replay_buffer import ReplayBuffer
+from .network import DQN
+from .replay_buffer import ReplayBuffer
 
 
 class DQNAgent:
@@ -69,6 +69,101 @@ class DQNAgent:
 
         self.learn_steps = 0
 
+    @staticmethod
+    def get_state(observation):
+        """
+        Convert a raw MansionState into one numerical state per elevator.
+
+        Each elevator receives the full building state, its own identity,
+        and the outstanding passenger requests.
+        """
+
+        elevator_states = observation.ElevatorStates
+        upward = observation.RequiringUpwardFloors
+        downward = observation.RequiringDownwardFloors
+
+        num_elevators = len(elevator_states)
+        num_floors = elevator_states[0].MaximumFloor
+
+        features = []
+
+        for elevator_id, elevator in enumerate(elevator_states):
+
+            elevator_features = []
+
+            # Features for every elevator in the building
+            for other in elevator_states:
+                elevator_features.extend([
+                    other.Floor / other.MaximumFloor,
+                    other.Velocity / other.MaximumSpeed
+                    if other.MaximumSpeed != 0 else 0.0,
+                    float(other.Direction),
+                    other.DoorState,
+                    float(other.DoorIsOpening),
+                    float(other.DoorIsClosing),
+                    other.LoadWeight / other.MaximumLoad
+                    if other.MaximumLoad != 0 else 0.0,
+                    other.CurrentDispatchTarget / other.MaximumFloor
+                    if other.MaximumFloor != 0 else 0.0,
+                ])
+
+            # Identity of the elevator making the decision.
+            elevator_features.extend([
+                1.0 if i == elevator_id else 0.0
+                for i in range(num_elevators)
+            ])
+
+            # Outstanding upward requests.
+            elevator_features.extend([
+                1.0 if floor in upward else 0.0
+                for floor in range(1, num_floors + 1)
+            ])
+
+            # Outstanding downward requests.
+            elevator_features.extend([
+                1.0 if floor in downward else 0.0
+                for floor in range(1, num_floors + 1)
+            ])
+
+            features.append(elevator_features)
+
+        return features
+
+
+    def action_to_command(self, action_index, num_floors):
+        """Convert a discrete action into a two-value LiftSim command."""
+
+        if not 0 <= action_index < self.action_dim:
+            raise ValueError("Action index is outside the action space.")
+
+        real_dim = 2 * num_floors
+
+        if action_index == real_dim:
+            return [0, 0]
+
+        if action_index == real_dim + 1:
+            return [-1, 1]
+
+        if action_index < num_floors:
+            return [action_index + 1, 1]
+
+        return [action_index - num_floors + 1, -1]
+
+    def actions_to_commands(self, action_indices, observation):
+        """Convert all elevator actions into a flattened LiftSim command."""
+
+        num_floors = observation.ElevatorStates[0].MaximumFloor
+
+        commands = []
+
+        for action_index in action_indices:
+            commands.extend(
+                self.action_to_command(int(action_index), num_floors)
+            )
+
+        return commands
+    
+
     def select_action(self, state, epsilon=0.0):
         """
         Select an action using an epsilon-greedy policy.
@@ -90,6 +185,24 @@ class DQNAgent:
             q_values = self.policy_network(state_tensor)
 
         return q_values.argmax(dim=1).item()
+
+    def act(self, observation):
+        """
+        Select greedy action for each elevator.
+        
+        Accepts a raw MansionState and returns commands in the format
+        expected by LiftSim.step().
+        """
+
+        states = self.get_state(observation)
+
+        action_indices = [
+            self.select_action(state, epsilon=0.0)
+            for state in states
+        ]
+
+        return self.actions_to_commands(action_indices, observation)
+    
 
     def store_transition(
         self,
@@ -189,3 +302,24 @@ class DQNAgent:
             )
 
         return loss.item()
+
+    def load_checkpoint(self, checkpoint_path):
+        """Load trained policy network weights."""
+
+        checkpoint = torch.load(
+            checkpoint_path,
+            map_location=self.device
+        )
+
+        # Verify network dimensions match the checkpoint
+        if checkpoint["state_dim"] != self.state_dim:
+            raise ValueError("Checkpoint state dimension mismatch.")
+        if checkpoint["action_dim"] != self.action_dim:
+            raise ValueError("Checkpoint action dimension mismatch.")
+
+        self.policy_network.load_state_dict(
+            checkpoint["policy_network"]
+        )
+        self.policy_network.eval()
+
+        print(f"DQN checkpoint loaded from: {checkpoint_path}")

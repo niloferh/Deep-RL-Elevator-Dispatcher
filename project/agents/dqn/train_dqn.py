@@ -1,28 +1,35 @@
+import sys
+from pathlib import Path
 
-import os
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import gym
+import metagym.liftsim
 
-from environment import LiftSimEnvironment
-from dqn_agent.agent import DQNAgent
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT))
 
+from project.agents.dqn.dqn_agent.agent import DQNAgent
+
+
+# Project paths
+PROJECT_DIR = REPO_ROOT / "project"
+CHECKPOINT_DIR = PROJECT_DIR / "checkpoints"
+CHECKPOINT_PATH = CHECKPOINT_DIR / "dqn_elevator.pth"
+PLOTS_DIR = PROJECT_DIR / "plots"
 
 # Training configuration
 
-# NUM_EPISODES = 500
-NUM_EPISODES = 10
-# MAX_STEPS_PER_EPISODE = 1000
-MAX_STEPS_PER_EPISODE = 300
+NUM_EPISODES = 500
+MAX_STEPS_PER_EPISODE = 1000
 
 LEARNING_RATE = 1e-3
 GAMMA = 0.99
 
-# BATCH_SIZE = 64
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 BUFFER_CAPACITY = 100000
-#LEARNING_STARTS = 1000
-LEARNING_STARTS = 100
+LEARNING_STARTS = 1000
 
 TARGET_UPDATE_FREQUENCY = 1000
 
@@ -31,14 +38,6 @@ EPSILON_END = 0.05
 EPSILON_DECAY_STEPS = 50000
 
 SEED = 42
-
-CHECKPOINT_DIR = "project/checkpoints"
-CHECKPOINT_PATH = os.path.join(
-    CHECKPOINT_DIR,
-    "dqn_elevator.pth"
-)
-
-PLOTS_DIR = "project/plots"
 
 
 def get_epsilon(step):
@@ -50,11 +49,16 @@ def get_epsilon(step):
         EPSILON_END - EPSILON_START
     )
 
+def reset_environment(env, seed=None):
+    """Reset the environment, optionally setting its random seed."""
+    if seed is not None and hasattr(env, "seed"):
+        env.seed(seed)
+    return env.reset()
 
 def plot_training_results(episode_rewards, episode_losses):
     """Plot and save reward and loss against episode"""
 
-    os.makedirs(PLOTS_DIR, exist_ok=True)
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
     episodes = range(1, len(episode_rewards) + 1)
 
@@ -66,7 +70,7 @@ def plot_training_results(episode_rewards, episode_losses):
     plt.title("Reward vs Episode")
     plt.grid(True)
 
-    plt.savefig(f"{PLOTS_DIR}/dqn_reward_vs_episode.png")
+    plt.savefig(PLOTS_DIR / "dqn_reward_vs_episode.png")
     plt.show()
     plt.close()
 
@@ -78,7 +82,7 @@ def plot_training_results(episode_rewards, episode_losses):
     plt.title("Loss vs Episode")
     plt.grid(True)
 
-    plt.savefig(f"{PLOTS_DIR}/dqn_loss_vs_episode.png")
+    plt.savefig(PLOTS_DIR / "dqn_loss_vs_episode.png")
     plt.show()
     plt.close()
 
@@ -87,18 +91,23 @@ def train():
 
     # Initialize environment
 
-    env = LiftSimEnvironment(render=False)
+    env = gym.make(
+        "liftsim-v0",
+        disable_env_checker=True
+    )
 
-    initial_observation = env.reset(seed=SEED)
+    initial_observation = reset_environment(env, seed=SEED)
 
-    states = env.get_observation()
+    initial_states = DQNAgent.get_state(initial_observation)
+    num_elevators = len(initial_states)
+    num_floors = initial_observation.ElevatorStates[0].MaximumFloor
 
-    state_dim = len(states[0])
-    action_dim = env.action_dim
+    state_dim = len(initial_states[0])
+    action_dim = 2 * num_floors + 2
 
     print("Environment initialized.")
-    print("Number of elevators:", env.num_elevators)
-    print("Number of floors:", env.num_floors)
+    print("Number of elevators:", num_elevators)
+    print("Number of floors:", num_floors)
     print("State dimension:", state_dim)
     print("Action dimension:", action_dim)
 
@@ -125,9 +134,9 @@ def train():
     for episode in range(NUM_EPISODES):
 
         # Reset environment at the beginning of each episode
-        env.reset(seed=SEED + episode)
+        observation = reset_environment(env, seed=SEED + episode)
 
-        states = env.get_observation()
+        states = agent.get_state(observation)
 
         episode_reward = 0.0
         current_episode_losses = []
@@ -137,22 +146,27 @@ def train():
             # Calculate exploration rate.
             epsilon = get_epsilon(total_steps)
 
-            # Select one action per elevator
-            actions = [
+            # Select one discrete action per elevator
+            action_indices = [
                 agent.select_action(state, epsilon)
                 for state in states
             ]
 
-            # Execute all elevator actions together
-            (
-                observation,
-                reward,
-                terminated,
-                truncated,
-                info
-            ) = env.step(actions)
+            # Convert discrete actions into LiftSim commands
+            commands = agent.actions_to_commands(action_indices, observation)
 
-            next_states = env.get_observation()
+            # Execute all elevator commands together
+            result = env.step(commands)
+
+            # Handle both old and new Gym step APIs
+            if len(result) == 4:
+                next_observation, reward, done, info = result
+                terminated = done
+                truncated = False
+            else:
+                next_observation, reward, terminated, truncated, info = result
+
+            next_states = agent.get_state(next_observation)
 
             # Define the end of episode
             done = (
@@ -162,11 +176,11 @@ def train():
             )
 
             # Store one transition per elevator
-            for i in range(env.num_elevators):
+            for i in range(num_elevators):
 
                 agent.store_transition(
                     state=states[i],
-                    action=actions[i],
+                    action=action_indices[i],
                     reward=reward,
                     next_state=next_states[i],
                     done=done
@@ -181,6 +195,7 @@ def train():
                     current_episode_losses.append(loss)
 
             # Move to the next state
+            observation = next_observation
             states = next_states
 
             episode_reward += reward
@@ -200,26 +215,21 @@ def train():
 
         # Print training progress
 
-        if (episode + 1) % 10 == 0:
+        average_reward = np.mean(episode_rewards[-10:])
+        recent_average_loss = np.mean(episode_losses[-10:])
 
-            average_reward = np.mean(
-                episode_rewards[-10:]
-            )
-
-            recent_average_loss = np.mean(episode_losses[-10:])
-
-            print(
-                f"Episode {episode + 1}/{NUM_EPISODES} | "
-                f"Steps: {total_steps} | "
-                f"Epsilon: {epsilon:.3f} | "
-                f"Average Reward: {average_reward:.5f} | "
-                f"Average Loss: {recent_average_loss:.5f}"
-            )
+        print(
+            f"Episode {episode + 1}/{NUM_EPISODES} | "
+            f"Steps: {total_steps} | "
+            f"Epsilon: {epsilon:.3f} | "
+            f"Average Reward: {average_reward:.5f} | "
+            f"Average Loss: {recent_average_loss:.5f}"
+        )
 
 
     # Save trained model
 
-    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 
     torch.save(
         {
@@ -232,6 +242,7 @@ def train():
         CHECKPOINT_PATH
     )
 
+    # Plot training results
     plot_training_results(episode_rewards, episode_losses)
 
     print("\nTraining completed.")
